@@ -191,7 +191,7 @@ export class AiCsvGenerator implements INodeType {
 		],
 	};
 
-	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[]> {
+	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
 
@@ -208,19 +208,19 @@ export class AiCsvGenerator implements INodeType {
 
 				switch (operation) {
 					case 'generateFromData':
-						const result = await this.generateFromData(i);
+						const result = this.generateFromData(this, i);
 						csvData = result.data;
 						headers = result.headers;
 						break;
 
 					case 'generateFromSchema':
-						const schemaResult = await this.generateFromSchema(i);
+						const schemaResult = this.generateFromSchema(this, i);
 						csvData = schemaResult.data;
 						headers = schemaResult.headers;
 						break;
 
 					case 'generateFromAiRequest':
-						const aiResult = await this.generateFromAiRequest(i);
+						const aiResult = this.generateFromAiRequest(this, i);
 						csvData = aiResult.data;
 						headers = aiResult.headers;
 						break;
@@ -260,7 +260,7 @@ export class AiCsvGenerator implements INodeType {
 
 				returnData.push(outputData);
 
-			} catch (error) {
+			} catch (error: any) {
 				if (this.continueOnFail()) {
 					returnData.push({
 						json: {
@@ -273,27 +273,27 @@ export class AiCsvGenerator implements INodeType {
 			}
 		}
 
-		return returnData;
+		return [returnData];
 	}
 
-	private async generateFromData(itemIndex: number): Promise<{data: any[], headers: string[]}> {
-		const dataSource = this.getNodeParameter('dataSource', itemIndex) as string;
+	private generateFromData(context: IExecuteFunctions, itemIndex: number): {data: any[], headers: string[]} {
+		const dataSource = context.getNodeParameter('dataSource', itemIndex) as string;
 		let data: any[] = [];
 
 		if (dataSource === 'inputData') {
-			const inputData = this.getInputData();
-			data = inputData.map(item => item.json);
+			const inputData = context.getInputData();
+			data = inputData.map((item: INodeExecutionData) => item.json);
 		} else {
-			const manualData = this.getNodeParameter('manualData', itemIndex) as string;
+			const manualData = context.getNodeParameter('manualData', itemIndex) as string;
 			try {
 				data = JSON.parse(manualData);
 			} catch (error) {
-				throw new NodeOperationError(this.getNode(), 'Invalid JSON in manual data');
+				throw new NodeOperationError(context.getNode(), 'Invalid JSON in manual data');
 			}
 		}
 
 		if (!Array.isArray(data) || data.length === 0) {
-			throw new NodeOperationError(this.getNode(), 'Data must be a non-empty array');
+			throw new NodeOperationError(context.getNode(), 'Data must be a non-empty array');
 		}
 
 		// Extract headers from the first object
@@ -302,19 +302,19 @@ export class AiCsvGenerator implements INodeType {
 		return { data, headers };
 	}
 
-	private async generateFromSchema(itemIndex: number): Promise<{data: any[], headers: string[]}> {
-		const schemaDefinition = this.getNodeParameter('schemaDefinition', itemIndex) as string;
-		const rowCount = this.getNodeParameter('rowCount', itemIndex) as number;
+	private generateFromSchema(context: IExecuteFunctions, itemIndex: number): {data: any[], headers: string[]} {
+		const schemaDefinition = context.getNodeParameter('schemaDefinition', itemIndex) as string;
+		const rowCount = context.getNodeParameter('rowCount', itemIndex) as number;
 
 		let schema: any;
 		try {
 			schema = JSON.parse(schemaDefinition);
 		} catch (error) {
-			throw new NodeOperationError(this.getNode(), 'Invalid JSON in schema definition');
+			throw new NodeOperationError(context.getNode(), 'Invalid JSON in schema definition');
 		}
 
 		if (!schema.columns || !Array.isArray(schema.columns)) {
-			throw new NodeOperationError(this.getNode(), 'Schema must contain a columns array');
+			throw new NodeOperationError(context.getNode(), 'Schema must contain a columns array');
 		}
 
 		const headers = schema.columns.map((col: any) => col.name);
@@ -334,9 +334,9 @@ export class AiCsvGenerator implements INodeType {
 		return { data, headers };
 	}
 
-	private async generateFromAiRequest(itemIndex: number): Promise<{data: any[], headers: string[]}> {
-		const aiRequest = this.getNodeParameter('aiRequest', itemIndex) as string;
-		const rowCount = this.getNodeParameter('rowCount', itemIndex) as number;
+	private generateFromAiRequest(context: IExecuteFunctions, itemIndex: number): {data: any[], headers: string[]} {
+		const aiRequest = context.getNodeParameter('aiRequest', itemIndex) as string;
+		const rowCount = context.getNodeParameter('rowCount', itemIndex) as number;
 
 		// Parse AI request to determine data structure
 		const parsedRequest = this.parseAiRequest(aiRequest);
@@ -373,22 +373,22 @@ export class AiCsvGenerator implements INodeType {
 		// Check for specific patterns in the request
 		const lowerRequest = request.toLowerCase();
 		
-		if (lowerRequest.includes('customer')) {
+		if (lowerRequest.indexOf('customer') !== -1) {
 			columns = commonPatterns.customer;
-		} else if (lowerRequest.includes('sales') || lowerRequest.includes('purchase')) {
+		} else if (lowerRequest.indexOf('sales') !== -1 || lowerRequest.indexOf('purchase') !== -1) {
 			columns = commonPatterns.sales;
-		} else if (lowerRequest.includes('employee') || lowerRequest.includes('staff')) {
+		} else if (lowerRequest.indexOf('employee') !== -1 || lowerRequest.indexOf('staff') !== -1) {
 			columns = commonPatterns.employee;
-		} else if (lowerRequest.includes('product') || lowerRequest.includes('inventory')) {
+		} else if (lowerRequest.indexOf('product') !== -1 || lowerRequest.indexOf('inventory') !== -1) {
 			columns = commonPatterns.product;
-		} else if (lowerRequest.includes('order')) {
+		} else if (lowerRequest.indexOf('order') !== -1) {
 			columns = commonPatterns.order;
 		} else {
 			// Extract potential column names from the request
 			const words = request.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || [];
 			const potentialColumns = words.filter(word => 
 				word.length > 2 && 
-				!['the', 'and', 'with', 'for', 'csv', 'file', 'data', 'rows', 'create', 'generate'].includes(word.toLowerCase())
+				['the', 'and', 'with', 'for', 'csv', 'file', 'data', 'rows', 'create', 'generate'].indexOf(word.toLowerCase()) === -1
 			);
 			
 			columns = potentialColumns.length > 0 ? potentialColumns.slice(0, 8) : ['id', 'name', 'value', 'date'];
@@ -414,7 +414,9 @@ export class AiCsvGenerator implements INodeType {
 			case 'boolean':
 				return index % 2 === 0;
 			case 'phone':
-				return `+1-555-${String(index + 1).padStart(4, '0')}`;
+				const phoneNum = String(index + 1);
+				const paddedPhone = '0000'.substring(0, 4 - phoneNum.length) + phoneNum;
+				return `+1-555-${paddedPhone}`;
 			default:
 				return `Value ${index + 1}`;
 		}
@@ -423,35 +425,37 @@ export class AiCsvGenerator implements INodeType {
 	private generateSampleValueFromColumn(columnName: string, index: number): any {
 		const lowerColumn = columnName.toLowerCase();
 		
-		if (lowerColumn.includes('id')) {
+		if (lowerColumn.indexOf('id') !== -1) {
 			return index + 1;
-		} else if (lowerColumn.includes('name')) {
+		} else if (lowerColumn.indexOf('name') !== -1) {
 			const names = ['John Doe', 'Jane Smith', 'Bob Johnson', 'Alice Brown', 'Charlie Wilson'];
 			return names[index % names.length];
-		} else if (lowerColumn.includes('email')) {
+		} else if (lowerColumn.indexOf('email') !== -1) {
 			return `user${index + 1}@example.com`;
-		} else if (lowerColumn.includes('phone')) {
-			return `+1-555-${String(index + 1000).padStart(4, '0')}`;
-		} else if (lowerColumn.includes('address')) {
+		} else if (lowerColumn.indexOf('phone') !== -1) {
+			const phoneNum = String(index + 1000);
+			const paddedPhone = '0000'.substring(0, 4 - phoneNum.length) + phoneNum;
+			return `+1-555-${paddedPhone}`;
+		} else if (lowerColumn.indexOf('address') !== -1) {
 			return `${123 + index} Main St`;
-		} else if (lowerColumn.includes('city')) {
+		} else if (lowerColumn.indexOf('city') !== -1) {
 			const cities = ['New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix'];
 			return cities[index % cities.length];
-		} else if (lowerColumn.includes('country')) {
+		} else if (lowerColumn.indexOf('country') !== -1) {
 			const countries = ['USA', 'Canada', 'UK', 'Germany', 'France'];
 			return countries[index % countries.length];
-		} else if (lowerColumn.includes('price') || lowerColumn.includes('total') || lowerColumn.includes('salary')) {
+		} else if (lowerColumn.indexOf('price') !== -1 || lowerColumn.indexOf('total') !== -1 || lowerColumn.indexOf('salary') !== -1) {
 			return (Math.random() * 1000 + 100).toFixed(2);
-		} else if (lowerColumn.includes('quantity') || lowerColumn.includes('stock')) {
+		} else if (lowerColumn.indexOf('quantity') !== -1 || lowerColumn.indexOf('stock') !== -1) {
 			return Math.floor(Math.random() * 100) + 1;
-		} else if (lowerColumn.includes('date')) {
+		} else if (lowerColumn.indexOf('date') !== -1) {
 			const date = new Date();
 			date.setDate(date.getDate() - index);
 			return date.toISOString().split('T')[0];
-		} else if (lowerColumn.includes('status')) {
+		} else if (lowerColumn.indexOf('status') !== -1) {
 			const statuses = ['Active', 'Inactive', 'Pending', 'Completed', 'Cancelled'];
 			return statuses[index % statuses.length];
-		} else if (lowerColumn.includes('category') || lowerColumn.includes('department')) {
+		} else if (lowerColumn.indexOf('category') !== -1 || lowerColumn.indexOf('department') !== -1) {
 			const categories = ['Electronics', 'Clothing', 'Books', 'Home', 'Sports'];
 			return categories[index % categories.length];
 		} else {
@@ -487,7 +491,7 @@ export class AiCsvGenerator implements INodeType {
 		const stringValue = String(value);
 		
 		// If the value contains the delimiter, newlines, or quotes, wrap it in quotes
-		if (stringValue.includes(delimiter) || stringValue.includes('\n') || stringValue.includes('\r') || stringValue.includes('"')) {
+		if (stringValue.indexOf(delimiter) !== -1 || stringValue.indexOf('\n') !== -1 || stringValue.indexOf('\r') !== -1 || stringValue.indexOf('"') !== -1) {
 			// Escape existing quotes by doubling them
 			const escapedValue = stringValue.replace(/"/g, '""');
 			return `"${escapedValue}"`;
@@ -496,4 +500,3 @@ export class AiCsvGenerator implements INodeType {
 		return stringValue;
 	}
 }
-
