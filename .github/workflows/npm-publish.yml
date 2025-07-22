@@ -26,23 +26,27 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+        
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           registry-url: 'https://registry.npmjs.org'
           
       - name: Install dependencies
-        run: npm install
+        run: pnpm install
         
       - name: Run tests (if any )
-        run: npm test --if-present
+        run: pnpm test --if-present
         
       - name: Build package
-        run: npm run build
+        run: pnpm run build
         
       - name: Publish to npm
-        run: npm publish --access public
+        run: pnpm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
