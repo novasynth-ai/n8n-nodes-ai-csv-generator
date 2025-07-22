@@ -4,6 +4,7 @@ import {
 	INodeType,
 	INodeTypeDescription,
 	NodeOperationError,
+	NodeConnectionType,
 } from 'n8n-workflow';
 
 export class AiCsvGenerator implements INodeType {
@@ -18,8 +19,8 @@ export class AiCsvGenerator implements INodeType {
 		defaults: {
 			name: 'AI CSV Generator',
 		},
-		inputs: ['main'],
-		outputs: ['main'],
+		inputs: [NodeConnectionType.Main],
+		outputs: [NodeConnectionType.Main],
 		properties: [
 			{
 				displayName: 'Operation',
@@ -208,19 +209,19 @@ export class AiCsvGenerator implements INodeType {
 
 				switch (operation) {
 					case 'generateFromData':
-						const result = this.generateFromData(this, i);
+						const result = generateFromData(this, i);
 						csvData = result.data;
 						headers = result.headers;
 						break;
 
 					case 'generateFromSchema':
-						const schemaResult = this.generateFromSchema(this, i);
+						const schemaResult = generateFromSchema(this, i);
 						csvData = schemaResult.data;
 						headers = schemaResult.headers;
 						break;
 
 					case 'generateFromAiRequest':
-						const aiResult = this.generateFromAiRequest(this, i);
+						const aiResult = generateFromAiRequest(this, i);
 						csvData = aiResult.data;
 						headers = aiResult.headers;
 						break;
@@ -230,7 +231,7 @@ export class AiCsvGenerator implements INodeType {
 				}
 
 				// Generate CSV content
-				const csvContent = this.generateCsvContent(csvData, headers, includeHeaders, delimiter);
+				const csvContent = generateCsvContent(csvData, headers, includeHeaders, delimiter);
 
 				// Prepare output based on format
 				const outputData: INodeExecutionData = {
@@ -275,228 +276,228 @@ export class AiCsvGenerator implements INodeType {
 
 		return [returnData];
 	}
+}
 
-	private generateFromData(context: IExecuteFunctions, itemIndex: number): {data: any[], headers: string[]} {
-		const dataSource = context.getNodeParameter('dataSource', itemIndex) as string;
-		let data: any[] = [];
+function generateFromData(context: IExecuteFunctions, itemIndex: number): {data: any[], headers: string[]} {
+	const dataSource = context.getNodeParameter('dataSource', itemIndex) as string;
+	let data: any[] = [];
 
-		if (dataSource === 'inputData') {
-			const inputData = context.getInputData();
-			data = inputData.map((item: INodeExecutionData) => item.json);
-		} else {
-			const manualData = context.getNodeParameter('manualData', itemIndex) as string;
-			try {
-				data = JSON.parse(manualData);
-			} catch (error) {
-				throw new NodeOperationError(context.getNode(), 'Invalid JSON in manual data');
-			}
-		}
-
-		if (!Array.isArray(data) || data.length === 0) {
-			throw new NodeOperationError(context.getNode(), 'Data must be a non-empty array');
-		}
-
-		// Extract headers from the first object
-		const headers = Object.keys(data[0]);
-
-		return { data, headers };
-	}
-
-	private generateFromSchema(context: IExecuteFunctions, itemIndex: number): {data: any[], headers: string[]} {
-		const schemaDefinition = context.getNodeParameter('schemaDefinition', itemIndex) as string;
-		const rowCount = context.getNodeParameter('rowCount', itemIndex) as number;
-
-		let schema: any;
+	if (dataSource === 'inputData') {
+		const inputData = context.getInputData();
+		data = inputData.map((item: INodeExecutionData) => item.json);
+	} else {
+		const manualData = context.getNodeParameter('manualData', itemIndex) as string;
 		try {
-			schema = JSON.parse(schemaDefinition);
+			data = JSON.parse(manualData);
 		} catch (error) {
-			throw new NodeOperationError(context.getNode(), 'Invalid JSON in schema definition');
+			throw new NodeOperationError(context.getNode(), 'Invalid JSON in manual data');
 		}
-
-		if (!schema.columns || !Array.isArray(schema.columns)) {
-			throw new NodeOperationError(context.getNode(), 'Schema must contain a columns array');
-		}
-
-		const headers = schema.columns.map((col: any) => col.name);
-		const data: any[] = [];
-
-		// Generate sample data based on schema
-		for (let i = 0; i < rowCount; i++) {
-			const row: any = {};
-			
-			schema.columns.forEach((column: any) => {
-				row[column.name] = this.generateSampleValue(column.type, i);
-			});
-
-			data.push(row);
-		}
-
-		return { data, headers };
 	}
 
-	private generateFromAiRequest(context: IExecuteFunctions, itemIndex: number): {data: any[], headers: string[]} {
-		const aiRequest = context.getNodeParameter('aiRequest', itemIndex) as string;
-		const rowCount = context.getNodeParameter('rowCount', itemIndex) as number;
+	if (!Array.isArray(data) || data.length === 0) {
+		throw new NodeOperationError(context.getNode(), 'Data must be a non-empty array');
+	}
 
-		// Parse AI request to determine data structure
-		const parsedRequest = this.parseAiRequest(aiRequest);
+	// Extract headers from the first object
+	const headers = Object.keys(data[0]);
+
+	return { data, headers };
+}
+
+function generateFromSchema(context: IExecuteFunctions, itemIndex: number): {data: any[], headers: string[]} {
+	const schemaDefinition = context.getNodeParameter('schemaDefinition', itemIndex) as string;
+	const rowCount = context.getNodeParameter('rowCount', itemIndex) as number;
+
+	let schema: any;
+	try {
+		schema = JSON.parse(schemaDefinition);
+	} catch (error) {
+		throw new NodeOperationError(context.getNode(), 'Invalid JSON in schema definition');
+	}
+
+	if (!schema.columns || !Array.isArray(schema.columns)) {
+		throw new NodeOperationError(context.getNode(), 'Schema must contain a columns array');
+	}
+
+	const headers = schema.columns.map((col: any) => col.name);
+	const data: any[] = [];
+
+	// Generate sample data based on schema
+	for (let i = 0; i < rowCount; i++) {
+		const row: any = {};
 		
-		const headers = parsedRequest.columns;
-		const data: any[] = [];
+		schema.columns.forEach((column: any) => {
+			row[column.name] = generateSampleValue(column.type, i);
+		});
 
-		// Generate sample data based on AI request
-		for (let i = 0; i < rowCount; i++) {
-			const row: any = {};
-			
-			parsedRequest.columns.forEach((column: string) => {
-				row[column] = this.generateSampleValueFromColumn(column, i);
-			});
-
-			data.push(row);
-		}
-
-		return { data, headers };
+		data.push(row);
 	}
 
-	private parseAiRequest(request: string): {columns: string[]} {
-		// Simple AI request parsing - in a real implementation, you might use NLP or AI APIs
-		const commonPatterns = {
-			customer: ['id', 'name', 'email', 'phone', 'address', 'city', 'country'],
-			sales: ['id', 'product', 'quantity', 'price', 'total', 'date', 'customer_id'],
-			employee: ['id', 'name', 'email', 'department', 'position', 'salary', 'hire_date'],
-			product: ['id', 'name', 'description', 'price', 'category', 'stock', 'sku'],
-			order: ['id', 'customer_id', 'product_id', 'quantity', 'total', 'status', 'date'],
-		};
+	return { data, headers };
+}
 
-		let columns: string[] = [];
+function generateFromAiRequest(context: IExecuteFunctions, itemIndex: number): {data: any[], headers: string[]} {
+	const aiRequest = context.getNodeParameter('aiRequest', itemIndex) as string;
+	const rowCount = context.getNodeParameter('rowCount', itemIndex) as number;
 
-		// Check for specific patterns in the request
-		const lowerRequest = request.toLowerCase();
+	// Parse AI request to determine data structure
+	const parsedRequest = parseAiRequest(aiRequest);
+	
+	const headers = parsedRequest.columns;
+	const data: any[] = [];
+
+	// Generate sample data based on AI request
+	for (let i = 0; i < rowCount; i++) {
+		const row: any = {};
 		
-		if (lowerRequest.indexOf('customer') !== -1) {
-			columns = commonPatterns.customer;
-		} else if (lowerRequest.indexOf('sales') !== -1 || lowerRequest.indexOf('purchase') !== -1) {
-			columns = commonPatterns.sales;
-		} else if (lowerRequest.indexOf('employee') !== -1 || lowerRequest.indexOf('staff') !== -1) {
-			columns = commonPatterns.employee;
-		} else if (lowerRequest.indexOf('product') !== -1 || lowerRequest.indexOf('inventory') !== -1) {
-			columns = commonPatterns.product;
-		} else if (lowerRequest.indexOf('order') !== -1) {
-			columns = commonPatterns.order;
-		} else {
-			// Extract potential column names from the request
-			const words = request.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || [];
-			const potentialColumns = words.filter(word => 
-				word.length > 2 && 
-				['the', 'and', 'with', 'for', 'csv', 'file', 'data', 'rows', 'create', 'generate'].indexOf(word.toLowerCase()) === -1
-			);
-			
-			columns = potentialColumns.length > 0 ? potentialColumns.slice(0, 8) : ['id', 'name', 'value', 'date'];
-		}
+		parsedRequest.columns.forEach((column: string) => {
+			row[column] = generateSampleValueFromColumn(column, i);
+		});
 
-		return { columns };
+		data.push(row);
 	}
 
-	private generateSampleValue(type: string, index: number): any {
-		switch (type.toLowerCase()) {
-			case 'number':
-			case 'integer':
-				return index + 1;
-			case 'string':
-			case 'text':
-				return `Sample Text ${index + 1}`;
-			case 'email':
-				return `user${index + 1}@example.com`;
-			case 'date':
-				const date = new Date();
-				date.setDate(date.getDate() - index);
-				return date.toISOString().split('T')[0];
-			case 'boolean':
-				return index % 2 === 0;
-			case 'phone':
-				const phoneNum = String(index + 1);
-				const paddedPhone = '0000'.substring(0, 4 - phoneNum.length) + phoneNum;
-				return `+1-555-${paddedPhone}`;
-			default:
-				return `Value ${index + 1}`;
-		}
-	}
+	return { data, headers };
+}
 
-	private generateSampleValueFromColumn(columnName: string, index: number): any {
-		const lowerColumn = columnName.toLowerCase();
+function parseAiRequest(request: string): {columns: string[]} {
+	// Simple AI request parsing - in a real implementation, you might use NLP or AI APIs
+	const commonPatterns = {
+		customer: ['id', 'name', 'email', 'phone', 'address', 'city', 'country'],
+		sales: ['id', 'product', 'quantity', 'price', 'total', 'date', 'customer_id'],
+		employee: ['id', 'name', 'email', 'department', 'position', 'salary', 'hire_date'],
+		product: ['id', 'name', 'description', 'price', 'category', 'stock', 'sku'],
+		order: ['id', 'customer_id', 'product_id', 'quantity', 'total', 'status', 'date'],
+	};
+
+	let columns: string[] = [];
+
+	// Check for specific patterns in the request
+	const lowerRequest = request.toLowerCase();
+	
+	if (lowerRequest.indexOf('customer') !== -1) {
+		columns = commonPatterns.customer;
+	} else if (lowerRequest.indexOf('sales') !== -1 || lowerRequest.indexOf('purchase') !== -1) {
+		columns = commonPatterns.sales;
+	} else if (lowerRequest.indexOf('employee') !== -1 || lowerRequest.indexOf('staff') !== -1) {
+		columns = commonPatterns.employee;
+	} else if (lowerRequest.indexOf('product') !== -1 || lowerRequest.indexOf('inventory') !== -1) {
+		columns = commonPatterns.product;
+	} else if (lowerRequest.indexOf('order') !== -1) {
+		columns = commonPatterns.order;
+	} else {
+		// Extract potential column names from the request
+		const words = request.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || [];
+		const potentialColumns = words.filter(word => 
+			word.length > 2 && 
+			['the', 'and', 'with', 'for', 'csv', 'file', 'data', 'rows', 'create', 'generate'].indexOf(word.toLowerCase()) === -1
+		);
 		
-		if (lowerColumn.indexOf('id') !== -1) {
+		columns = potentialColumns.length > 0 ? potentialColumns.slice(0, 8) : ['id', 'name', 'value', 'date'];
+	}
+
+	return { columns };
+}
+
+function generateSampleValue(type: string, index: number): any {
+	switch (type.toLowerCase()) {
+		case 'number':
+		case 'integer':
 			return index + 1;
-		} else if (lowerColumn.indexOf('name') !== -1) {
-			const names = ['John Doe', 'Jane Smith', 'Bob Johnson', 'Alice Brown', 'Charlie Wilson'];
-			return names[index % names.length];
-		} else if (lowerColumn.indexOf('email') !== -1) {
+		case 'string':
+		case 'text':
+			return `Sample Text ${index + 1}`;
+		case 'email':
 			return `user${index + 1}@example.com`;
-		} else if (lowerColumn.indexOf('phone') !== -1) {
-			const phoneNum = String(index + 1000);
-			const paddedPhone = '0000'.substring(0, 4 - phoneNum.length) + phoneNum;
-			return `+1-555-${paddedPhone}`;
-		} else if (lowerColumn.indexOf('address') !== -1) {
-			return `${123 + index} Main St`;
-		} else if (lowerColumn.indexOf('city') !== -1) {
-			const cities = ['New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix'];
-			return cities[index % cities.length];
-		} else if (lowerColumn.indexOf('country') !== -1) {
-			const countries = ['USA', 'Canada', 'UK', 'Germany', 'France'];
-			return countries[index % countries.length];
-		} else if (lowerColumn.indexOf('price') !== -1 || lowerColumn.indexOf('total') !== -1 || lowerColumn.indexOf('salary') !== -1) {
-			return (Math.random() * 1000 + 100).toFixed(2);
-		} else if (lowerColumn.indexOf('quantity') !== -1 || lowerColumn.indexOf('stock') !== -1) {
-			return Math.floor(Math.random() * 100) + 1;
-		} else if (lowerColumn.indexOf('date') !== -1) {
+		case 'date':
 			const date = new Date();
 			date.setDate(date.getDate() - index);
 			return date.toISOString().split('T')[0];
-		} else if (lowerColumn.indexOf('status') !== -1) {
-			const statuses = ['Active', 'Inactive', 'Pending', 'Completed', 'Cancelled'];
-			return statuses[index % statuses.length];
-		} else if (lowerColumn.indexOf('category') !== -1 || lowerColumn.indexOf('department') !== -1) {
-			const categories = ['Electronics', 'Clothing', 'Books', 'Home', 'Sports'];
-			return categories[index % categories.length];
-		} else {
-			return `Sample ${index + 1}`;
-		}
+		case 'boolean':
+			return index % 2 === 0;
+		case 'phone':
+			const phoneNum = String(index + 1);
+			const paddedPhone = '0000'.substring(0, 4 - phoneNum.length) + phoneNum;
+			return `+1-555-${paddedPhone}`;
+		default:
+			return `Value ${index + 1}`;
+	}
+}
+
+function generateSampleValueFromColumn(columnName: string, index: number): any {
+	const lowerColumn = columnName.toLowerCase();
+	
+	if (lowerColumn.indexOf('id') !== -1) {
+		return index + 1;
+	} else if (lowerColumn.indexOf('name') !== -1) {
+		const names = ['John Doe', 'Jane Smith', 'Bob Johnson', 'Alice Brown', 'Charlie Wilson'];
+		return names[index % names.length];
+	} else if (lowerColumn.indexOf('email') !== -1) {
+		return `user${index + 1}@example.com`;
+	} else if (lowerColumn.indexOf('phone') !== -1) {
+		const phoneNum = String(index + 1000);
+		const paddedPhone = '0000'.substring(0, 4 - phoneNum.length) + phoneNum;
+		return `+1-555-${paddedPhone}`;
+	} else if (lowerColumn.indexOf('address') !== -1) {
+		return `${123 + index} Main St`;
+	} else if (lowerColumn.indexOf('city') !== -1) {
+		const cities = ['New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix'];
+		return cities[index % cities.length];
+	} else if (lowerColumn.indexOf('country') !== -1) {
+		const countries = ['USA', 'Canada', 'UK', 'Germany', 'France'];
+		return countries[index % countries.length];
+	} else if (lowerColumn.indexOf('price') !== -1 || lowerColumn.indexOf('total') !== -1 || lowerColumn.indexOf('salary') !== -1) {
+		return (Math.random() * 1000 + 100).toFixed(2);
+	} else if (lowerColumn.indexOf('quantity') !== -1 || lowerColumn.indexOf('stock') !== -1) {
+		return Math.floor(Math.random() * 100) + 1;
+	} else if (lowerColumn.indexOf('date') !== -1) {
+		const date = new Date();
+		date.setDate(date.getDate() - index);
+		return date.toISOString().split('T')[0];
+	} else if (lowerColumn.indexOf('status') !== -1) {
+		const statuses = ['Active', 'Inactive', 'Pending', 'Completed', 'Cancelled'];
+		return statuses[index % statuses.length];
+	} else if (lowerColumn.indexOf('category') !== -1 || lowerColumn.indexOf('department') !== -1) {
+		const categories = ['Electronics', 'Clothing', 'Books', 'Home', 'Sports'];
+		return categories[index % categories.length];
+	} else {
+		return `Sample ${index + 1}`;
+	}
+}
+
+function generateCsvContent(data: any[], headers: string[], includeHeaders: boolean, delimiter: string): string {
+	const rows: string[] = [];
+
+	// Add headers if requested
+	if (includeHeaders) {
+		rows.push(headers.map(header => escapeCsvValue(header, delimiter)).join(delimiter));
 	}
 
-	private generateCsvContent(data: any[], headers: string[], includeHeaders: boolean, delimiter: string): string {
-		const rows: string[] = [];
-
-		// Add headers if requested
-		if (includeHeaders) {
-			rows.push(headers.map(header => this.escapeCsvValue(header, delimiter)).join(delimiter));
-		}
-
-		// Add data rows
-		data.forEach(row => {
-			const values = headers.map(header => {
-				const value = row[header];
-				return this.escapeCsvValue(value, delimiter);
-			});
-			rows.push(values.join(delimiter));
+	// Add data rows
+	data.forEach(row => {
+		const values = headers.map(header => {
+			const value = row[header];
+			return escapeCsvValue(value, delimiter);
 		});
+		rows.push(values.join(delimiter));
+	});
 
-		return rows.join('\n');
+	return rows.join('\n');
+}
+
+function escapeCsvValue(value: any, delimiter: string): string {
+	if (value === null || value === undefined) {
+		return '';
 	}
 
-	private escapeCsvValue(value: any, delimiter: string): string {
-		if (value === null || value === undefined) {
-			return '';
-		}
-
-		const stringValue = String(value);
-		
-		// If the value contains the delimiter, newlines, or quotes, wrap it in quotes
-		if (stringValue.indexOf(delimiter) !== -1 || stringValue.indexOf('\n') !== -1 || stringValue.indexOf('\r') !== -1 || stringValue.indexOf('"') !== -1) {
-			// Escape existing quotes by doubling them
-			const escapedValue = stringValue.replace(/"/g, '""');
-			return `"${escapedValue}"`;
-		}
-
-		return stringValue;
+	const stringValue = String(value);
+	
+	// If the value contains the delimiter, newlines, or quotes, wrap it in quotes
+	if (stringValue.indexOf(delimiter) !== -1 || stringValue.indexOf('\n') !== -1 || stringValue.indexOf('\r') !== -1 || stringValue.indexOf('"') !== -1) {
+		// Escape existing quotes by doubling them
+		const escapedValue = stringValue.replace(/"/g, '""');
+		return `"${escapedValue}"`;
 	}
+
+	return stringValue;
 }
