@@ -1,6 +1,6 @@
 {
   "name": "@smiles-are-always/n8n-nodes-ai-csv-generator",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "n8n node for generating CSV files dynamically based on AI agent requests",
   "license": "MIT",
   "homepage": "https://github.com/novasynth-ai/n8n-nodes-ai-csv-generator",
