@@ -19,8 +19,7 @@
     "format": "prettier nodes --write",
     "lint": "eslint nodes package.json",
     "lintfix": "eslint nodes package.json --fix",
-    "prepublishOnly": "npm run build && npm run lint -s",
-    "preinstall": "npx only-allow pnpm"
+    "prepublishOnly": "npm run build && npm run lint -s"
   },
   "files": [
     "dist"
@@ -34,13 +33,14 @@
   },
   "devDependencies": {
     "@types/node": "^18.19.0",
-    "@typescript-eslint/parser": "^6.0.0",
-    "eslint": "^8.42.0",
-    "eslint-plugin-n8n-nodes-base": "^1.11.0",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.57.1",
+    "eslint-plugin-n8n-nodes-base": "^1.16.1",
     "gulp": "^4.0.2",
     "gulp-typescript": "^6.0.0-alpha.1",
     "n8n-workflow": "^1.0.0",
-    "prettier": "^2.7.1",
+    "prettier": "^3.2.5",
     "typescript": "~5.3.3",
     "only-allow": "^1.2.1"
   },
